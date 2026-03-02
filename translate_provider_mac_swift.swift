@@ -56,6 +56,22 @@ private func requestTranslation(
 	return response.targetText
 }
 
+@available(macOS 15.0, *)
+private func translateErrorCode(_ error: Error) -> String {
+	guard let translationError = error as? TranslationError else {
+		return "unknown"
+	}
+	if #available(macOS 26.0, *), case .notInstalled = translationError {
+		return "local-language-pack-missing"
+	}
+	switch translationError {
+	case .unsupportedLanguagePairing:
+		return "local-language-pack-missing"
+	default:
+		return "unknown"
+	}
+}
+
 @_cdecl("TranslateProviderMacSwiftIsAvailable")
 func TranslateProviderMacSwiftIsAvailable() -> Bool {
 	if #available(macOS 15.0, *) {
@@ -91,7 +107,7 @@ func TranslateProviderMacSwiftTranslate(
 				callback(
 					context,
 					nil,
-					duplicatedCString(String(describing: error)))
+					duplicatedCString(translateErrorCode(error)))
 			}
 		} else {
 			callback(context, nil, duplicatedCString("unsupported-platform"))

@@ -13,6 +13,17 @@ class PeerData;
 
 namespace Ui {
 
+enum class TranslateProviderError {
+	None = 0,
+	Unknown,
+	LocalLanguagePackMissing,
+};
+
+struct TranslateProviderResult {
+	std::optional<TextWithEntities> text;
+	TranslateProviderError error = TranslateProviderError::None;
+};
+
 struct TranslateProviderRequest {
 	not_null<PeerData*> peer;
 	MsgId msgId = 0;
@@ -26,7 +37,7 @@ public:
 	virtual void request(
 		TranslateProviderRequest request,
 		LanguageId to,
-		Fn<void(std::optional<TextWithEntities>)> done) = 0;
+		Fn<void(TranslateProviderResult)> done) = 0;
 };
 
 } // namespace Ui
