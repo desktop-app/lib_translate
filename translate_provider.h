@@ -6,10 +6,9 @@
 //
 #pragma once
 
-#include "spellcheck/platform/platform_language.h"
 #include "ui/text/text_entity.h"
 
-class PeerData;
+struct LanguageId;
 
 namespace Ui {
 
@@ -25,7 +24,10 @@ struct TranslateProviderResult {
 };
 
 struct TranslateProviderRequest {
-	not_null<PeerData*> peer;
+	using PeerId = int64;
+	using MsgId = int64;
+
+	PeerId peerId = 0;
 	MsgId msgId = 0;
 	TextWithEntities text;
 };
