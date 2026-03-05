@@ -7,9 +7,8 @@
 if (APPLE)
     enable_language(Swift)
 
-    set(CMAKE_Swift_LANGUAGE_VERSION 5)
+    set(CMAKE_Swift_LANGUAGE_VERSION 6)
     set(CMAKE_Swift_COMPILATION_MODE wholemodule)
-    set(CMAKE_Swift_DEPLOYMENT_TARGET ${CMAKE_OSX_DEPLOYMENT_TARGET})
 
     get_filename_component(src_loc . REALPATH)
 

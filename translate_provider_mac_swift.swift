@@ -14,6 +14,14 @@ typealias TranslateProviderMacSwiftCallback = @convention(c) (
 	UnsafePointer<CChar>?
 ) -> Void
 
+private struct CallbackContext: @unchecked Sendable {
+	let value: UnsafeMutableRawPointer?
+}
+
+private struct CallbackFunction: @unchecked Sendable {
+	let value: TranslateProviderMacSwiftCallback
+}
+
 private func duplicatedCString(_ value: String) -> UnsafePointer<CChar>? {
 	guard let duplicated = strdup(value) else {
 		return nil
@@ -36,24 +44,22 @@ private func requestTranslation(
 	let target = Locale.Language(identifier: targetLanguage)
 	let availability = LanguageAvailability()
 	let status = await availability.status(from: source, to: target)
-	if status != .installed {
-		switch status {
-		case .supported:
-			if #available(macOS 26.0, *) {
-				throw TranslationError.notInstalled
-			}
-			throw TranslationError.unsupportedLanguagePairing
-		case .unsupported:
-			throw TranslationError.unsupportedLanguagePairing
-		case .installed:
-			break
-		@unknown default:
-			throw TranslationError.unsupportedLanguagePairing
-		}
+	switch status {
+	case .installed:
+		break
+	case .supported, .unsupported:
+		throw TranslationError.unsupportedLanguagePairing
+	@unknown default:
+		throw TranslationError.unsupportedLanguagePairing
 	}
-	let session = TranslationSession(installedSource: source, target: target)
-	let response = try await session.translate(text)
-	return response.targetText
+#if compiler(>=6.2)
+	if #available(macOS 26.0, *) {
+		let session = TranslationSession(installedSource: source, target: target)
+		let response = try await session.translate(text)
+		return response.targetText
+	}
+#endif
+	throw TranslationError.unsupportedLanguagePairing
 }
 
 @available(macOS 15.0, *)
@@ -61,9 +67,11 @@ private func translateErrorCode(_ error: Error) -> String {
 	guard let translationError = error as? TranslationError else {
 		return "unknown"
 	}
+#if compiler(>=6.2)
 	if #available(macOS 26.0, *), case .notInstalled = translationError {
 		return "local-language-pack-missing"
 	}
+#endif
 	switch translationError {
 	case .unsupportedLanguagePairing:
 		return "local-language-pack-missing"
@@ -74,9 +82,11 @@ private func translateErrorCode(_ error: Error) -> String {
 
 @_cdecl("TranslateProviderMacSwiftIsAvailable")
 func TranslateProviderMacSwiftIsAvailable() -> Bool {
-	if #available(macOS 15.0, *) {
+#if compiler(>=6.2)
+	if #available(macOS 26.0, *) {
 		return true
 	}
+#endif
 	return false
 }
 
@@ -96,21 +106,31 @@ func TranslateProviderMacSwiftTranslate(
 	}
 	let sourceText = String(cString: sourceTextUtf8)
 	let targetLanguageCode = String(cString: targetLanguageCodeUtf8)
-	Task.detached(priority: .utility) {
-		if #available(macOS 15.0, *) {
-			do {
-				let translated = try await requestTranslation(
-					sourceText,
-					targetLanguageCode)
-				callback(context, duplicatedCString(translated), nil)
-			} catch {
-				callback(
-					context,
-					nil,
-					duplicatedCString(translateErrorCode(error)))
+	let callbackFunction = CallbackFunction(value: callback)
+	let callbackContext = CallbackContext(value: context)
+	if #available(macOS 10.15, *) {
+		Task.detached(priority: .utility) {
+			let callback = callbackFunction.value
+			let context = callbackContext.value
+#if compiler(>=6.2)
+			if #available(macOS 26.0, *) {
+				do {
+					let translated = try await requestTranslation(
+						sourceText,
+						targetLanguageCode)
+					callback(context, duplicatedCString(translated), nil)
+				} catch {
+					callback(
+						context,
+						nil,
+						duplicatedCString(translateErrorCode(error)))
+				}
+				return
 			}
-		} else {
+#endif
 			callback(context, nil, duplicatedCString("unsupported-platform"))
 		}
+		return
 	}
+	callback(context, nil, duplicatedCString("unsupported-platform"))
 }
