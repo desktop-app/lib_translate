@@ -48,18 +48,24 @@ public:
 			doneAll();
 			return;
 		}
-		auto remaining = std::make_shared<int>(requests.size());
-		auto doneOneShared = std::make_shared<Fn<void(int, TranslateProviderResult)>>(
-			std::move(doneOne));
-		auto doneAllShared = std::make_shared<Fn<void()>>(std::move(doneAll));
+		struct State {
+			int remaining = 0;
+			Fn<void(int, TranslateProviderResult)> doneOne;
+			Fn<void()> doneAll;
+		};
+		auto state = std::make_shared<State>(State{
+			.remaining = int(requests.size()),
+			.doneOne = std::move(doneOne),
+			.doneAll = std::move(doneAll),
+		});
 		for (auto i = 0; i != requests.size(); ++i) {
 			request(
 				std::move(requests[i]),
 				to,
 				[=](TranslateProviderResult result) {
-					(*doneOneShared)(i, std::move(result));
-					if (!--*remaining) {
-						(*doneAllShared)();
+					state->doneOne(i, std::move(result));
+					if (!--state->remaining) {
+						state->doneAll();
 					}
 				});
 		}
