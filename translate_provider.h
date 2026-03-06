@@ -48,6 +48,17 @@ public:
 			doneAll();
 			return;
 		}
+		if (requests.size() == 1) {
+			request(
+				std::move(requests.front()),
+				to,
+				[doneOne = std::move(doneOne), doneAll = std::move(doneAll)](
+						TranslateProviderResult result) {
+					doneOne(0, std::move(result));
+					doneAll();
+				});
+			return;
+		}
 		struct State {
 			int remaining = 0;
 			Fn<void(int, TranslateProviderResult)> doneOne;
