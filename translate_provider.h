@@ -23,7 +23,7 @@ struct TranslateProviderResult {
 };
 
 struct TranslateProviderRequest {
-	using PeerId = int64;
+	using PeerId = uint64;
 	using MsgId = int64;
 
 	PeerId peerId = 0;
